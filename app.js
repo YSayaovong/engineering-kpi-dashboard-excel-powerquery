@@ -1,217 +1,494 @@
-// ===== Configuration =====
-// If your CSV column names differ, set them here or via the UI mapping:
-let CFG = {
-  level: '',       // e.g., 'Level' or 'Area'
-  status: '',      // e.g., 'Status'
-  created: '',     // e.g., 'Created' or 'Start Date'
-  due: '',         // e.g., 'Due Date'
-  completed: ''    // e.g., 'Completed'
+/* ===========================================
+   Engineering Project Tracker — Analytics
+   Reads Excel in-browser (SheetJS) and charts with Chart.js
+   =========================================== */
+
+const state = {
+  rawRows: [],
+  mapped: {
+    status: null, level: null, created: null, due: null, completed: null, title: null
+  },
+  charts: {},
+  filteredRows: [],
+  categories: ["Design", "Nameplates", "OCR & NC", "Other Levels"]
 };
 
-// ===== Utilities =====
-function parseDate(s){
+// Auto-load default file if present
+window.addEventListener("DOMContentLoaded", async () => {
+  wireUI();
+  try {
+    const resp = await fetch("./data/Project%20Tracking.xlsx", { cache: "no-store" });
+    if (resp.ok) {
+      const buf = await resp.arrayBuffer();
+      await loadFromArrayBuffer(buf);
+    }
+  } catch {}
+});
+
+function wireUI(){
+  const fileInput = document.getElementById("fileInput");
+  const urlForm = document.getElementById("urlForm");
+  fileInput.addEventListener("change", handleFile);
+  urlForm.addEventListener("submit", handleUrlLoad);
+
+  document.getElementById("applyMapping").addEventListener("click", applyMapping);
+  document.getElementById("applyFilters").addEventListener("click", () => {
+    applyFilters(); refreshAll();
+  });
+  document.getElementById("resetFilters").addEventListener("click", () => {
+    resetFilters(); applyFilters(); refreshAll();
+  });
+  document.getElementById("downloadCsv").addEventListener("click", downloadFilteredCsv);
+}
+
+async function handleFile(e){
+  const file = e.target.files?.[0];
+  if(!file) return;
+  const buf = await file.arrayBuffer();
+  await loadFromArrayBuffer(buf);
+}
+
+async function handleUrlLoad(e){
+  e.preventDefault();
+  const url = document.getElementById("xlsxUrl").value.trim();
+  if(!url) return;
+  const resp = await fetch(url, { cache: "no-store" });
+  const buf = await resp.arrayBuffer();
+  await loadFromArrayBuffer(buf);
+}
+
+async function loadFromArrayBuffer(buf){
+  const wb = XLSX.read(buf, { type: "array" });
+  const firstSheet = wb.SheetNames[0];
+  const ws = wb.Sheets[firstSheet];
+  const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
+
+  state.rawRows = rows;
+  suggestMappings(rows);
+  populateMappingSelectors(Object.keys(rows[0] ?? {}));
+  applyMapping(); // initial apply with suggested map
+  applyFilters();
+  refreshAll();
+}
+
+/* ---------- Column Mapping ---------- */
+
+const friendlyMap = {
+  status: ["status","state","stage","progress"],
+  level: ["level","area","dept","department","section"],
+  created: ["created","created date","start date","opened","opened date","requested"],
+  due: ["due","due date","target","deadline"],
+  completed: ["completed","completed date","done","finish","finished date","closed","closed date"],
+  title: ["title","task","name","summary","subject","description"]
+};
+
+function suggestMappings(rows){
+  const columns = Object.keys(rows[0] ?? {});
+  const mapOut = {};
+  for(const key of Object.keys(friendlyMap)){
+    mapOut[key] = bestColumn(columns, friendlyMap[key]);
+  }
+  state.mapped = mapOut;
+}
+
+function bestColumn(columns, candidates){
+  const lower = columns.map(c => c.toLowerCase());
+  for(const cand of candidates){
+    const idx = lower.findIndex(c => c === cand);
+    if(idx >= 0) return columns[idx];
+  }
+  // contains
+  for(const cand of candidates){
+    const idx = lower.findIndex(c => c.includes(cand));
+    if(idx >= 0) return columns[idx];
+  }
+  return null;
+}
+
+function populateMappingSelectors(columns){
+  const ids = ["mapStatus","mapLevel","mapCreated","mapDue","mapCompleted","mapTitle"];
+  const keys = ["status","level","created","due","completed","title"];
+
+  ids.forEach((id, i) => {
+    const sel = document.getElementById(id);
+    sel.innerHTML = `<option value="">— Not Mapped —</option>` + columns.map(c => {
+      const selected = state.mapped[keys[i]] === c ? "selected" : "";
+      return `<option ${selected}>${c}</option>`;
+    }).join("");
+  });
+}
+
+function applyMapping(){
+  const ids = ["mapStatus","mapLevel","mapCreated","mapDue","mapCompleted","mapTitle"];
+  const keys = ["status","level","created","due","completed","title"];
+  ids.forEach((id, i) => state.mapped[keys[i]] = document.getElementById(id).value || null);
+  buildFilters();
+  applyFilters();
+  refreshAll();
+}
+
+/* ---------- Categorization ---------- */
+
+function categorize(levelVal = ""){
+  const v = String(levelVal || "").toLowerCase();
+  if (v.includes("design")) return "Design";
+  if (v.includes("nameplate") || v.includes("name plate")) return "Nameplates";
+  if (v.includes("ocr") || v.includes("nc") || v.includes("numerical control")) return "OCR & NC";
+  return "Other Levels";
+}
+
+/* ---------- Filters ---------- */
+
+function buildFilters(){
+  const statusSet = new Set();
+  const catSet = new Set();
+
+  for(const r of state.rawRows){
+    const s = getVal(r, "status");
+    if (s) statusSet.add(String(s));
+    catSet.add(categorize(getVal(r,"level")));
+  }
+
+  const statusSel = document.getElementById("filterStatus");
+  statusSel.innerHTML = [...statusSet].sort().map(v => `<option selected>${escapeHtml(v)}</option>`).join("");
+
+  const catSel = document.getElementById("filterCategory");
+  catSel.innerHTML = state.categories.map(v => `<option selected>${v}</option>`).join("");
+
+  // date bounds
+  const {minDate, maxDate} = createdDateBounds();
+  const fromEl = document.getElementById("filterFrom");
+  const toEl = document.getElementById("filterTo");
+  fromEl.value = minDate ? fmtDateInput(minDate) : "";
+  toEl.value = maxDate ? fmtDateInput(maxDate) : "";
+}
+
+function applyFilters(){
+  const statusChosen = selectedValues(document.getElementById("filterStatus"));
+  const catsChosen = selectedValues(document.getElementById("filterCategory"));
+  const from = parseDate(document.getElementById("filterFrom").value);
+  const to = parseDate(document.getElementById("filterTo").value, true);
+
+  state.filteredRows = state.rawRows.filter(r => {
+    const sOk = !statusChosen.length || statusChosen.includes(String(getVal(r,"status")));
+    const c = categorize(getVal(r,"level"));
+    const cOk = !catsChosen.length || catsChosen.includes(c);
+    const cd = toDate(getVal(r,"created"));
+    const dOk = (!from || (cd && cd >= from)) && (!to || (cd && cd <= to));
+    return sOk && cOk && dOk;
+  });
+}
+
+function resetFilters(){ buildFilters(); }
+
+/* ---------- Data helpers ---------- */
+
+function getVal(row, key){
+  const col = state.mapped[key];
+  return col ? row[col] : null;
+}
+
+function toDate(v){
+  if(!v) return null;
+  // SheetJS may provide Date, Serial, or string
+  if (v instanceof Date) return v;
+  if (typeof v === "number") return XLSX.SSF.parse_date_code(v) ? excelSerialToDate(v) : null;
+  const t = Date.parse(v);
+  return isNaN(t) ? null : new Date(t);
+}
+
+function excelSerialToDate(n){
+  // Excel serial days since 1899-12-30
+  const utc = new Date(Date.UTC(1899,11,30));
+  return new Date(utc.getTime() + n*86400000);
+}
+
+function createdDateBounds(){
+  const dates = state.rawRows.map(r => toDate(getVal(r,"created"))).filter(Boolean);
+  if(!dates.length) return {minDate:null, maxDate:null};
+  return {minDate: new Date(Math.min(...dates)), maxDate: new Date(Math.max(...dates))};
+}
+
+function fmtDateInput(d){ return d.toISOString().slice(0,10); }
+function parseDate(s, endOfDay=false){
   if(!s) return null;
   const d = new Date(s);
-  return isNaN(d) ? null : d;
-}
-function daysBetween(a,b){ if(!a||!b) return NaN; return Math.round((b - a)/(1000*60*60*24)); }
-function fmt(n){ return isFinite(n) ? n.toLocaleString() : '—'; }
-function pct(n){ return isFinite(n) ? (n*100).toFixed(1)+'%' : '—'; }
-function toMonthKey(d){ if(!d) return ''; const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'); return `${y}-${m}`; }
-
-function categorize(levelVal){
-  const text = String(levelVal||'').toLowerCase();
-  if (text.match(/\bdesign\b/)) return 'Design';
-  if (text.includes('nameplate')) return 'Nameplates';
-  if (text.match(/\b(ocr|o\.c\.r\.)\b/) || text.match(/\b(nc|n\.c\.)\b/) || text.includes('ocr/nc')) return 'OCR & NC';
-  return 'Other Levels';
+  if (endOfDay){ d.setHours(23,59,59,999); }
+  return d;
 }
 
-function inferStatus(row){
-  const sKey = CFG.status && row.hasOwnProperty(CFG.status) ? CFG.status : null;
-  if (sKey){
-    const v = String(row[sKey]||'').trim();
-    if (v) return v;
-  }
-  // fallback: use completed date
-  const compKey = CFG.completed && row.hasOwnProperty(CFG.completed) ? CFG.completed : null;
-  const comp = compKey ? row[compKey] : row['_Completed'];
-  return comp ? 'Completed' : 'Open';
+function daysBetween(a,b){
+  if(!a || !b) return null;
+  const ms = b - a;
+  return ms/86400000;
 }
 
-function barChart(canvasId, labels, datasets, stacked=false){
-  const ctx = document.getElementById(canvasId).getContext('2d');
-  return new Chart(ctx, {
-    type: 'bar',
-    data: { labels, datasets },
-    options: {
-      responsive: true,
-      interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { position: 'bottom' } },
-      scales: { x: { stacked }, y: { stacked, beginAtZero: true } }
-    }
-  });
+function selectedValues(sel){
+  return Array.from(sel.options).filter(o=>o.selected).map(o=>o.value);
 }
 
-function hist(values, edges){
-  const bins = new Array(edges.length-1).fill(0);
-  values.forEach(v=>{
-    const x = Number(v);
-    if(!isFinite(x)) return;
-    for(let i=0;i<edges.length-1;i++){
-      if(x >= edges[i] && x < edges[i+1]){ bins[i]++; return; }
-    }
-    if(x >= edges[edges.length-1]) bins[bins.length-1]++;
-  });
-  return bins;
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-function tableFromData(el, rows, columns){
-  if(!columns || !columns.length){
-    const keys = new Set();
-    rows.slice(0, 50).forEach(r => Object.keys(r).forEach(k=>{ if(!k.startsWith('_')) keys.add(k); }));
-    columns = Array.from(keys);
-  }
-  const table = document.createElement('table');
-  const thead = document.createElement('thead');
-  const trh = document.createElement('tr');
-  columns.forEach(c=>{
-    const th=document.createElement('th'); th.textContent=c; trh.appendChild(th);
-  });
-  thead.appendChild(trh);
-  table.appendChild(thead);
-  const tbody=document.createElement('tbody');
-  rows.forEach(r=>{
-    const tr=document.createElement('tr');
-    columns.forEach(c=>{
-      const td=document.createElement('td');
-      td.textContent = r[c] ?? '';
-      tr.appendChild(td);
-    });
-    tbody.appendChild(tr);
-  });
-  table.appendChild(tbody);
-  el.innerHTML='';
-  el.appendChild(table);
-}
+/* ---------- KPIs ---------- */
 
-// ===== Load CSV and render =====
-async function loadCSV(path){
-  return new Promise((resolve, reject) => {
-    Papa.parse(path, {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: results => resolve(results.data),
-      error: err => reject(err)
-    });
-  });
-}
+function computeKpis(rows){
+  const total = rows.length;
 
-function applyMappingFromUI(){
-  CFG.level = document.getElementById('cfg-level').value.trim();
-  CFG.status = document.getElementById('cfg-status').value.trim();
-  CFG.created = document.getElementById('cfg-created').value.trim();
-  CFG.due = document.getElementById('cfg-due').value.trim();
-  CFG.completed = document.getElementById('cfg-completed').value.trim();
-}
+  const open = rows.filter(r => !toDate(getVal(r,"completed"))).length;
 
-document.getElementById('applyCfg').addEventListener('click', () => {
-  render(); // re-render with new mapping
-});
-
-async function render(){
-  const rows = await loadCSV('data/project-tracking.csv');
-
-  // Infer columns if not provided
-  function findCol(regexList){
-    const cols = rows.length ? Object.keys(rows[0]) : [];
-    for(const r of regexList){
-      const re = new RegExp(r, 'i');
-      const hit = cols.find(c => re.test(c));
-      if(hit) return hit;
-    }
-    return '';
-  }
-
-  if(!CFG.level) CFG.level = findCol(['level','area','dept','department','station','work\s*center','process','stage']);
-  if(!CFG.status) CFG.status = findCol(['status','state','phase','progress']);
-  if(!CFG.created) CFG.created = findCol(['created','opened','start']);
-  if(!CFG.due) CFG.due = findCol(['due','deadline']);
-  if(!CFG.completed) CFG.completed = findCol(['completed','closed','finish']);
-
-  // Enrich
+  // Completed MTD
   const now = new Date();
-  const recs = rows.map(r => {
-    const created = parseDate(r[CFG.created]);
-    const due = parseDate(r[CFG.due]);
-    const completed = parseDate(r[CFG.completed]);
-    const status = inferStatus({...r, '_Completed': r[CFG.completed]});
-    const age = created ? (completed ? daysBetween(created, completed) : daysBetween(created, now)) : NaN;
-    const onTime = (due && completed) ? (completed <= due) : null;
-    const category = categorize(r[CFG.level] || '');
+  const mStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const mEnd = new Date(now.getFullYear(), now.getMonth()+1, 0, 23,59,59,999);
+  const completedMTD = rows.filter(r => {
+    const cd = toDate(getVal(r,"completed"));
+    return cd && cd >= mStart && cd <= mEnd;
+  }).length;
 
-    return {
-      ...r,
-      _Category: category,
-      _Status: status,
-      _AgeDays: isFinite(age) ? age : '',
-      _Created: created ? created.toISOString() : '',
-      _Due: due ? due.toISOString() : '',
-      _Completed: completed ? completed.toISOString() : '',
-      _Month: created ? toMonthKey(created) : ''
-    };
+  // On-time % last 30 d (completed where completed <= due)
+  const last30 = new Date(); last30.setDate(last30.getDate()-30);
+  const compLast30 = rows.filter(r => {
+    const c = toDate(getVal(r,"completed"));
+    return c && c >= last30;
   });
+  const onTime = compLast30.length
+    ? Math.round(100 * compLast30.filter(r => {
+        const c = toDate(getVal(r,"completed"));
+        const d = toDate(getVal(r,"due"));
+        return c && d && c <= d;
+      }).length / compLast30.length)
+    : 0;
 
-  // KPIs
-  const total = recs.length;
-  const open = recs.filter(r => String(r._Status).toLowerCase()!=='completed').length;
-  const ages = recs.map(r=>Number(r._AgeDays)).filter(x=>isFinite(x));
-  const avgAge = ages.length ? (ages.reduce((a,b)=>a+b,0)/ages.length) : NaN;
-  const onTimeVals = recs.map(r=>r._Due && r._Completed ? (new Date(r._Completed) <= new Date(r._Due)) : null).filter(v=>v===true || v===false);
-  const onTimePct = onTimeVals.length ? (onTimeVals.filter(Boolean).length / onTimeVals.length) : NaN;
+  // Median cycle (created -> completed days) for completed rows
+  const cycles = rows.map(r => {
+    const c = toDate(getVal(r,"created"));
+    const f = toDate(getVal(r,"completed"));
+    const x = daysBetween(c,f);
+    return (x!=null && x>=0) ? x : null;
+  }).filter(v => v!=null).sort((a,b)=>a-b);
+  const med = cycles.length ? (cycles.length%2 ? cycles[(cycles.length-1)/2] : (cycles[cycles.length/2-1]+cycles[cycles.length/2])/2) : 0;
 
-  document.getElementById('kpi-total').textContent = fmt(total);
-  document.getElementById('kpi-open').textContent = fmt(open);
-  document.getElementById('kpi-age').textContent = isFinite(avgAge) ? Math.round(avgAge) : '—';
-  document.getElementById('kpi-ontime').textContent = pct(onTimePct);
-
-  // Grouping
-  const design = recs.filter(r => r._Category === 'Design');
-  const nameplates = recs.filter(r => r._Category === 'Nameplates');
-  const ocrnc = recs.filter(r => r._Category === 'OCR & NC');
-  const others = recs.filter(r => r._Category === 'Other Levels');
-
-  // Tables
-  const cols = rows.length ? Object.keys(rows[0]) : [];
-  tableFromData(document.getElementById('design-table'), design, cols);
-  tableFromData(document.getElementById('nameplates-table'), nameplates, cols);
-  tableFromData(document.getElementById('ocrnc-table'), ocrnc, cols);
-  tableFromData(document.getElementById('other-table'), others, cols);
-
-  // Charts
-  const cats = ['Design','Nameplates','OCR & NC','Other Levels'];
-  const statuses = Array.from(new Set(recs.map(r=>r._Status)));
-  const datasets = statuses.map(s => ({
-    label: s,
-    data: cats.map(cat => recs.filter(r => r._Category===cat && r._Status===s).length)
-  }));
-  barChart('statusByCategory', cats, datasets, true);
-
-  const completed = recs.filter(r => r._Completed);
-  const months = Array.from(new Set(completed.map(r=>r._Completed.slice(0,7)))).sort();
-  const throughput = months.map(m => completed.filter(r => String(r._Completed).startsWith(m)).length);
-  barChart('monthlyThroughput', months, [{ label: 'Completed', data: throughput }], false);
-
-  const agesList = ages;
-  const edges = [0,7,14,21,30,60,90,180,365];
-  const bins = hist(agesList, edges);
-  const labels = ['0-6','7-13','14-20','21-29','30-59','60-89','90-179','180-365+'];
-  barChart('agingDist', labels, [{ label: 'Items', data: bins }], false);
+  return { total, open, completedMTD, onTime, medCycle: Math.round(med) };
 }
 
-// Initial render
-render().catch(err => {
-  console.error('Failed to load CSV:', err);
-  alert('Could not load data/project-tracking.csv. Make sure the file exists in your repo.');
-});
+function renderKpis(k){
+  document.getElementById("kpiTotal").textContent = k.total.toLocaleString();
+  document.getElementById("kpiOpen").textContent = k.open.toLocaleString();
+  document.getElementById("kpiCompletedMTD").textContent = k.completedMTD.toLocaleString();
+  document.getElementById("kpiOnTime").textContent = `${k.onTime}%`;
+  document.getElementById("kpiCycle").textContent = `${k.medCycle}`;
+}
+
+/* ---------- Aggregations ---------- */
+
+function groupStatus(rows){
+  const m = new Map();
+  for(const r of rows){
+    const s = String(getVal(r,"status") ?? "Unknown");
+    m.set(s, (m.get(s)||0)+1);
+  }
+  return m;
+}
+
+function groupStatusByCategory(rows){
+  // categories fixed order
+  const byCat = new Map(state.categories.map(c => [c, new Map()]));
+  for(const r of rows){
+    const cat = categorize(getVal(r,"level"));
+    const st = String(getVal(r,"status") ?? "Unknown");
+    const m = byCat.get(cat);
+    m.set(st, (m.get(st)||0)+1);
+  }
+  return byCat;
+}
+
+function monthlyThroughput(rows){
+  // count completed per YYYY-MM
+  const m = new Map();
+  for(const r of rows){
+    const c = toDate(getVal(r,"completed"));
+    if(!c) continue;
+    const key = `${c.getFullYear()}-${String(c.getMonth()+1).padStart(2,"0")}`;
+    m.set(key, (m.get(key)||0)+1);
+  }
+  const keys = [...m.keys()].sort();
+  return { labels: keys, values: keys.map(k=>m.get(k)) };
+}
+
+function wipTrend(rows){
+  // open over time at month granularity from min(created) to current month
+  const createdDates = rows.map(r=>toDate(getVal(r,"created"))).filter(Boolean);
+  if(!createdDates.length) return {labels:[], values:[]};
+
+  const min = new Date(Math.min(...createdDates));
+  const today = new Date();
+  const cursor = new Date(min.getFullYear(), min.getMonth(), 1);
+  const labels = [], values = [];
+
+  while (cursor <= today){
+    const periodEnd = new Date(cursor.getFullYear(), cursor.getMonth()+1, 0, 23,59,59,999);
+    const openCount = rows.filter(r => {
+      const cr = toDate(getVal(r,"created"));
+      const cm = toDate(getVal(r,"completed"));
+      return cr && cr <= periodEnd && (!cm || cm > periodEnd);
+    }).length;
+    labels.push(`${cursor.getFullYear()}-${String(cursor.getMonth()+1).padStart(2,"0")}`);
+    values.push(openCount);
+    cursor.setMonth(cursor.getMonth()+1);
+  }
+  return {labels, values};
+}
+
+/* ---------- Charts ---------- */
+
+function destroyChart(key){
+  if(state.charts[key]){ state.charts[key].destroy(); delete state.charts[key]; }
+}
+
+function renderCharts(){
+  const rows = state.filteredRows;
+
+  // Status Pie
+  {
+    destroyChart("statusPie");
+    const ctx = document.getElementById("statusPie");
+    const m = groupStatus(rows);
+    state.charts.statusPie = new Chart(ctx, {
+      type: "doughnut",
+      data: {
+        labels: [...m.keys()],
+        datasets: [{ data: [...m.values()] }]
+      },
+      options: { plugins: { legend: { labels: { color: "#cbd5e1" } } } }
+    });
+  }
+
+  // Category Stacked Bar
+  {
+    destroyChart("categoryStacked");
+    const ctx = document.getElementById("categoryStacked");
+    const byCat = groupStatusByCategory(rows);
+    const cats = state.categories;
+    const allStatuses = new Set();
+    for(const m of byCat.values()) for(const s of m.keys()) allStatuses.add(s);
+    const statuses = [...allStatuses];
+
+    const datasets = statuses.map((s,i)=>({
+      label: s,
+      data: cats.map(c => byCat.get(c).get(s) || 0),
+      stack: "stack1"
+    }));
+
+    state.charts.categoryStacked = new Chart(ctx, {
+      type: "bar",
+      data: { labels: cats, datasets },
+      options: {
+        responsive: true,
+        scales: {
+          x: { ticks:{ color:"#cbd5e1" }, stacked:true, grid:{ color:"#1f2937" } },
+          y: { ticks:{ color:"#cbd5e1" }, stacked:true, grid:{ color:"#1f2937" } }
+        },
+        plugins: { legend: { labels:{ color:"#cbd5e1" } } }
+      }
+    });
+  }
+
+  // Throughput Bar
+  {
+    destroyChart("throughputBar");
+    const ctx = document.getElementById("throughputBar");
+    const {labels, values} = monthlyThroughput(rows);
+    state.charts.throughputBar = new Chart(ctx, {
+      type: "bar",
+      data: { labels, datasets: [{ label:"Completed", data: values }] },
+      options: {
+        scales: {
+          x: { ticks:{ color:"#cbd5e1" }, grid:{ color:"#1f2937" } },
+          y: { ticks:{ color:"#cbd5e1" }, grid:{ color:"#1f2937" } }
+        },
+        plugins: { legend:{ labels:{ color:"#cbd5e1" } } }
+      }
+    });
+  }
+
+  // WIP line
+  {
+    destroyChart("wipLine");
+    const ctx = document.getElementById("wipLine");
+    const {labels, values} = wipTrend(rows);
+    state.charts.wipLine = new Chart(ctx, {
+      type: "line",
+      data: { labels, datasets: [{ label:"Open Items", data: values, tension: 0.25 }] },
+      options: {
+        scales: {
+          x: { ticks:{ color:"#cbd5e1" }, grid:{ color:"#1f2937" } },
+          y: { ticks:{ color:"#cbd5e1" }, grid:{ color:"#1f2937" } }
+        },
+        plugins: { legend:{ labels:{ color:"#cbd5e1" } } }
+      }
+    });
+  }
+}
+
+/* ---------- Table & CSV ---------- */
+
+function renderTable(){
+  const rows = state.filteredRows;
+  const fields = visibleFields();
+
+  const thead = document.querySelector("#dataTable thead");
+  const tbody = document.querySelector("#dataTable tbody");
+  thead.innerHTML = `<tr>${fields.map(f=>`<th>${escapeHtml(f)}</th>`).join("")}</tr>`;
+
+  const maxRows = 1000; // safety
+  tbody.innerHTML = rows.slice(0,maxRows).map(r => {
+    return `<tr>${fields.map(f=>{
+      const v = r[f];
+      return `<td>${escapeHtml(formatCell(v))}</td>`;
+    }).join("")}</tr>`;
+  }).join("");
+}
+
+function visibleFields(){
+  // show mapped columns first, then everything else
+  const mappedCols = Object.values(state.mapped).filter(Boolean);
+  const all = new Set(Object.keys(state.rawRows[0] ?? {}));
+  const rest = [...all].filter(c => !mappedCols.includes(c));
+  return [...mappedCols, ...rest];
+}
+
+function formatCell(v){
+  if (v instanceof Date) return v.toISOString().slice(0,10);
+  return v==null ? "" : String(v);
+}
+
+function downloadFilteredCsv(){
+  const rows = state.filteredRows;
+  const fields = visibleFields();
+  const header = fields.join(",");
+  const body = rows.map(r => fields.map(f => csvEscape(r[f])).join(",")).join("\n");
+  const blob = new Blob([header+"\n"+body], {type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "filtered-project-tracking.csv";
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function csvEscape(v){
+  if (v==null) return "";
+  const s = String(v);
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
+  return s;
+}
+
+/* ---------- Refresh pipeline ---------- */
+
+function refreshAll(){
+  const k = computeKpis(state.filteredRows);
+  renderKpis(k);
+  renderCharts();
+  renderTable();
+}
