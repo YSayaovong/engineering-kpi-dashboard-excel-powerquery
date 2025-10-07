@@ -3,99 +3,78 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Engineering Project — Simple Analysis</title>
+  <title>Engineering Mini Dashboard</title>
   <link rel="stylesheet" href="style.css" />
   <!-- SheetJS for Excel parsing -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <!-- Chart.js for simple charts -->
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
-  <header class="topbar">
-    <h1>Engineering Project — Simple Analysis</h1>
-    <div class="loader-row">
+  <header class="top">
+    <h1>Engineering Mini Dashboard</h1>
+    <div class="actions">
       <label class="btn">
         <input id="fileInput" type="file" accept=".xlsx,.xls" hidden />
-        Load Excel
+        Upload Excel
       </label>
       <span class="muted">or</span>
-      <form id="urlForm">
-        <input id="xlsxUrl" type="text" placeholder="https://.../Project%20Tracking.xlsx" />
-        <button type="submit" class="btn">Load URL</button>
-      </form>
-      <span class="muted tip">Tip: place file at <code>/data/Project Tracking.xlsx</code> to auto-load.</span>
+      <button id="loadDefault" class="btn ghost">Load /data/Project&nbsp;Tracking.xlsx</button>
     </div>
+    <p class="muted tip">This simple view shows counts and one bar chart per group. Overdue is only shown when the row has a Project ID, is not completed, and the Due Date is past.</p>
   </header>
 
-  <main class="container">
-    <section class="panel">
-      <h2>Column Mapping</h2>
-      <div class="grid mapping">
-        <div>
-          <label>Project ID</label>
-          <select id="mapProjectId"></select>
-        </div>
-        <div>
-          <label>Status</label>
-          <select id="mapStatus"></select>
-        </div>
-        <div>
-          <label>Level / Area</label>
-          <select id="mapLevel"></select>
-        </div>
-        <div>
-          <label>Due Date</label>
-          <select id="mapDue"></select>
-        </div>
-        <div>
-          <label>Completed Date</label>
-          <select id="mapCompleted"></select>
-        </div>
-        <div class="align-end">
-          <button id="applyMapping" class="btn primary">Apply</button>
-        </div>
-      </div>
+  <main class="wrap">
+    <!-- Global KPIs -->
+    <section class="kpis">
+      <div class="kpi"><div class="k">Total</div><div id="k_total" class="v">—</div></div>
+      <div class="kpi"><div class="k">Open</div><div id="k_open" class="v">—</div></div>
+      <div class="kpi"><div class="k">Completed</div><div id="k_completed" class="v">—</div></div>
+      <div class="kpi"><div class="k">Overdue</div><div id="k_overdue" class="v">—</div></div>
     </section>
 
-    <section class="grid three">
+    <!-- Groups -->
+    <section class="grid">
       <div class="card">
-        <h3>Nameplates + Nameplate Errors</h3>
+        <h2>Nameplates + Nameplate Errors</h2>
         <div class="counts">
-          <div><span class="lbl">Total</span><span id="np_total" class="val">—</span></div>
-          <div><span class="lbl">Open</span><span id="np_open" class="val">—</span></div>
-          <div><span class="lbl">Completed</span><span id="np_completed" class="val">—</span></div>
-          <div><span class="lbl">Overdue</span><span id="np_overdue" class="val">—</span></div>
+          <div><span>Total</span><strong id="np_total">—</strong></div>
+          <div><span>Open</span><strong id="np_open">—</strong></div>
+          <div><span>Completed</span><strong id="np_completed">—</strong></div>
+          <div><span>Overdue</span><strong id="np_overdue">—</strong></div>
         </div>
         <canvas id="np_chart"></canvas>
       </div>
 
       <div class="card">
-        <h3>Tank Size + Internal Layout + Design Errors</h3>
+        <h2>Tank Size + Internal Layout + Design Errors</h2>
         <div class="counts">
-          <div><span class="lbl">Total</span><span id="ts_total" class="val">—</span></div>
-          <div><span class="lbl">Open</span><span id="ts_open" class="val">—</span></div>
-          <div><span class="lbl">Completed</span><span id="ts_completed" class="val">—</span></div>
-          <div><span class="lbl">Overdue</span><span id="ts_overdue" class="val">—</span></div>
+          <div><span>Total</span><strong id="ts_total">—</strong></div>
+          <div><span>Open</span><strong id="ts_open">—</strong></div>
+          <div><span>Completed</span><strong id="ts_completed">—</strong></div>
+          <div><span>Overdue</span><strong id="ts_overdue">—</strong></div>
         </div>
         <canvas id="ts_chart"></canvas>
       </div>
 
       <div class="card">
-        <h3>Detailing + Detailing Errors</h3>
+        <h2>Detailing + Detailing Errors</h2>
         <div class="counts">
-          <div><span class="lbl">Total</span><span id="dt_total" class="val">—</span></div>
-          <div><span class="lbl">Open</span><span id="dt_open" class="val">—</span></div>
-          <div><span class="lbl">Completed</span><span id="dt_completed" class="val">—</span></div>
-          <div><span class="lbl">Overdue</span><span id="dt_overdue" class="val">—</span></div>
+          <div><span>Total</span><strong id="dt_total">—</strong></div>
+          <div><span>Open</span><strong id="dt_open">—</strong></div>
+          <div><span>Completed</span><strong id="dt_completed">—</strong></div>
+          <div><span>Overdue</span><strong id="dt_overdue">—</strong></div>
         </div>
         <canvas id="dt_chart"></canvas>
       </div>
     </section>
+
+    <section class="panel">
+      <button id="downloadCsv" class="btn">Download summary CSV</button>
+    </section>
   </main>
 
-  <footer class="footer">
-    <span>Minimal engineering analysis — upload .xlsx and view counts.</span>
-  </footer>
+  <footer class="foot">Simple counts + charts. Drop into GitHub Pages.</footer>
 
   <script src="app.js"></script>
 </body>
