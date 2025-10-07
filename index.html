@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Engineering Project Tracker Dashboard</title>
+  <link rel="stylesheet" href="style.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+<body>
+  <header class="header">
+    <h1>Engineering Project Tracker</h1>
+    <p class="subtitle">
+      Static dashboard reading <code>data/project-tracking.csv</code>. 
+      Update the CSV in your repo and GitHub Pages will reflect it on refresh.
+    </p>
+  </header>
+
+  <section class="config">
+    <details>
+      <summary>Column Mapping (optional)</summary>
+      <div class="mapping">
+        <p>Set the column names your CSV uses. Leave blank to auto-detect.</p>
+        <label>Level/Area: <input id="cfg-level" placeholder="e.g., Level or Area"/></label>
+        <label>Status: <input id="cfg-status" placeholder="e.g., Status"/></label>
+        <label>Created Date: <input id="cfg-created" placeholder="e.g., Created or Start Date"/></label>
+        <label>Due Date: <input id="cfg-due" placeholder="e.g., Due Date"/></label>
+        <label>Completed Date: <input id="cfg-completed" placeholder="e.g., Completed"/></label>
+        <button id="applyCfg">Apply</button>
+      </div>
+    </details>
+  </section>
+
+  <section class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-title">Total Items</div>
+      <div class="kpi-value" id="kpi-total">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Open Items</div>
+      <div class="kpi-value" id="kpi-open">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Avg Age (days)</div>
+      <div class="kpi-value" id="kpi-age">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">On-Time %</div>
+      <div class="kpi-value" id="kpi-ontime">—</div>
+    </div>
+  </section>
+
+  <section class="charts">
+    <div class="chart-card">
+      <h2>Status by Category</h2>
+      <canvas id="statusByCategory"></canvas>
+    </div>
+    <div class="chart-card">
+      <h2>Monthly Throughput</h2>
+      <canvas id="monthlyThroughput"></canvas>
+    </div>
+    <div class="chart-card">
+      <h2>Aging Distribution (days)</h2>
+      <canvas id="agingDist"></canvas>
+    </div>
+  </section>
+
+  <section class="sections">
+    <h2>Design</h2>
+    <div id="design-table" class="table-wrap"></div>
+
+    <h2>Nameplates</h2>
+    <div id="nameplates-table" class="table-wrap"></div>
+
+    <h2>OCR &amp; NC</h2>
+    <div id="ocrnc-table" class="table-wrap"></div>
+
+    <h2>Other Levels</h2>
+    <div id="other-table" class="table-wrap"></div>
+  </section>
+
+  <footer class="footer">
+    <p>Deploy via GitHub Pages. Keep your CSV at <code>data/project-tracking.csv</code>.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
