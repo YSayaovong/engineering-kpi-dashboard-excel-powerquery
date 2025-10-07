@@ -3,79 +3,40 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Engineering Mini Dashboard</title>
+  <title>Engineering — Bar & Pie</title>
   <link rel="stylesheet" href="style.css" />
-  <!-- SheetJS for Excel parsing -->
+  <!-- SheetJS -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <header class="top">
-    <h1>Engineering Mini Dashboard</h1>
+    <h1>Engineering — Bar & Pie</h1>
     <div class="actions">
       <label class="btn">
         <input id="fileInput" type="file" accept=".xlsx,.xls" hidden />
         Upload Excel
       </label>
-      <span class="muted">or</span>
       <button id="loadDefault" class="btn ghost">Load /data/Project&nbsp;Tracking.xlsx</button>
+      <span id="fileName" class="muted"></span>
     </div>
-    <p class="muted tip">This simple view shows counts and one bar chart per group. Overdue is only shown when the row has a Project ID, is not completed, and the Due Date is past.</p>
   </header>
 
   <main class="wrap">
-    <!-- Global KPIs -->
-    <section class="kpis">
-      <div class="kpi"><div class="k">Total</div><div id="k_total" class="v">—</div></div>
-      <div class="kpi"><div class="k">Open</div><div id="k_open" class="v">—</div></div>
-      <div class="kpi"><div class="k">Completed</div><div id="k_completed" class="v">—</div></div>
-      <div class="kpi"><div class="k">Overdue</div><div id="k_overdue" class="v">—</div></div>
-    </section>
-
-    <!-- Groups -->
-    <section class="grid">
+    <div class="charts">
       <div class="card">
-        <h2>Nameplates + Nameplate Errors</h2>
-        <div class="counts">
-          <div><span>Total</span><strong id="np_total">—</strong></div>
-          <div><span>Open</span><strong id="np_open">—</strong></div>
-          <div><span>Completed</span><strong id="np_completed">—</strong></div>
-          <div><span>Overdue</span><strong id="np_overdue">—</strong></div>
-        </div>
-        <canvas id="np_chart"></canvas>
+        <h2>Total by Group (Bar)</h2>
+        <canvas id="barChart"></canvas>
       </div>
-
       <div class="card">
-        <h2>Tank Size + Internal Layout + Design Errors</h2>
-        <div class="counts">
-          <div><span>Total</span><strong id="ts_total">—</strong></div>
-          <div><span>Open</span><strong id="ts_open">—</strong></div>
-          <div><span>Completed</span><strong id="ts_completed">—</strong></div>
-          <div><span>Overdue</span><strong id="ts_overdue">—</strong></div>
-        </div>
-        <canvas id="ts_chart"></canvas>
+        <h2>Status Distribution (Pie)</h2>
+        <canvas id="pieChart"></canvas>
       </div>
-
-      <div class="card">
-        <h2>Detailing + Detailing Errors</h2>
-        <div class="counts">
-          <div><span>Total</span><strong id="dt_total">—</strong></div>
-          <div><span>Open</span><strong id="dt_open">—</strong></div>
-          <div><span>Completed</span><strong id="dt_completed">—</strong></div>
-          <div><span>Overdue</span><strong id="dt_overdue">—</strong></div>
-        </div>
-        <canvas id="dt_chart"></canvas>
-      </div>
-    </section>
-
-    <section class="panel">
-      <button id="downloadCsv" class="btn">Download summary CSV</button>
-    </section>
+    </div>
   </main>
 
-  <footer class="foot">Simple counts + charts. Drop into GitHub Pages.</footer>
-
+  <footer class="foot">Just bar + pie. Overdue counted only when Project ID present, not completed, and Due &lt; today.</footer>
   <script src="app.js"></script>
 </body>
 </html>
