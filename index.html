@@ -28,7 +28,7 @@
       </form>
     </div>
     <p class="hint">
-      Tip: Place <code>Project Tracking.xlsx</code> in <code>/data/</code> and the app will auto-load it. File columns are auto-mapped; adjust in “Column Mapping” if needed.
+      Tip: Place <code>Project Tracking.xlsx</code> in <code>/data/</code> and the app will auto-load it. Adjust “Column Mapping” if needed.
     </p>
   </header>
 
@@ -37,6 +37,10 @@
     <section class="panel">
       <h2>Column Mapping</h2>
       <div class="grid mapping-grid">
+        <div>
+          <label>Project ID</label>
+          <select id="mapProjectId"></select>
+        </div>
         <div>
           <label>Status</label>
           <select id="mapStatus"></select>
@@ -98,8 +102,8 @@
           <select id="filterStatus" multiple></select>
         </div>
         <div>
-          <label>Category</label>
-          <select id="filterCategory" multiple></select>
+          <label>Group</label>
+          <select id="filterGroup" multiple></select>
         </div>
         <div>
           <label>Date Range (Created)</label>
@@ -119,16 +123,16 @@
     <!-- Charts -->
     <section class="charts">
       <div class="chart-card">
-        <div class="chart-title">Status Distribution</div>
-        <canvas id="statusPie"></canvas>
+        <div class="chart-title">Nameplates + Nameplate Errors (Stacked)</div>
+        <canvas id="grpNameplate"></canvas>
       </div>
       <div class="chart-card">
-        <div class="chart-title">Status by Category (Stacked)</div>
-        <canvas id="categoryStacked"></canvas>
+        <div class="chart-title">Tank Size + Internal Layout + Design Errors (Stacked)</div>
+        <canvas id="grpDesign"></canvas>
       </div>
       <div class="chart-card">
-        <div class="chart-title">Monthly Throughput (Completed per Month)</div>
-        <canvas id="throughputBar"></canvas>
+        <div class="chart-title">Detailing + Detailing Errors (Stacked)</div>
+        <canvas id="grpDetailing"></canvas>
       </div>
       <div class="chart-card">
         <div class="chart-title">WIP Trend (Open Items Over Time)</div>
