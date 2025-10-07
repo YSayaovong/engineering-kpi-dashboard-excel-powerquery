@@ -1,87 +1,156 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Engineering Project Tracker Dashboard</title>
-  <link rel="stylesheet" href="style.css"/>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Engineering Project Tracker — Analytics</title>
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- SheetJS (XLSX parser) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
-  <header class="header">
-    <h1>Engineering Project Tracker</h1>
-    <p class="subtitle">
-      Static dashboard reading <code>data/project-tracking.csv</code>. 
-      Update the CSV in your repo and GitHub Pages will reflect it on refresh.
+  <header class="topbar">
+    <h1>Engineering Project Tracker — Analytics</h1>
+    <div class="file-loaders">
+      <label class="btn">
+        <input id="fileInput" type="file" accept=".xlsx,.xls" hidden />
+        Load Excel
+      </label>
+
+      <div class="divider">or</div>
+
+      <form id="urlForm">
+        <input id="xlsxUrl" type="text" placeholder="https://.../Project%20Tracking.xlsx" />
+        <button type="submit" class="btn">Load from URL</button>
+      </form>
+    </div>
+    <p class="hint">
+      Tip: Place <code>Project Tracking.xlsx</code> in <code>/data/</code> and the app will auto-load it. File columns are auto-mapped; adjust in “Column Mapping” if needed.
     </p>
   </header>
 
-  <section class="config">
-    <details>
-      <summary>Column Mapping (optional)</summary>
-      <div class="mapping">
-        <p>Set the column names your CSV uses. Leave blank to auto-detect.</p>
-        <label>Level/Area: <input id="cfg-level" placeholder="e.g., Level or Area"/></label>
-        <label>Status: <input id="cfg-status" placeholder="e.g., Status"/></label>
-        <label>Created Date: <input id="cfg-created" placeholder="e.g., Created or Start Date"/></label>
-        <label>Due Date: <input id="cfg-due" placeholder="e.g., Due Date"/></label>
-        <label>Completed Date: <input id="cfg-completed" placeholder="e.g., Completed"/></label>
-        <button id="applyCfg">Apply</button>
+  <main class="container">
+    <!-- Column Mapping -->
+    <section class="panel">
+      <h2>Column Mapping</h2>
+      <div class="grid mapping-grid">
+        <div>
+          <label>Status</label>
+          <select id="mapStatus"></select>
+        </div>
+        <div>
+          <label>Level / Area</label>
+          <select id="mapLevel"></select>
+        </div>
+        <div>
+          <label>Created Date</label>
+          <select id="mapCreated"></select>
+        </div>
+        <div>
+          <label>Due Date</label>
+          <select id="mapDue"></select>
+        </div>
+        <div>
+          <label>Completed Date</label>
+          <select id="mapCompleted"></select>
+        </div>
+        <div>
+          <label>Title / Task</label>
+          <select id="mapTitle"></select>
+        </div>
       </div>
-    </details>
-  </section>
+      <button id="applyMapping" class="btn primary">Apply Mapping</button>
+    </section>
 
-  <section class="kpi-grid">
-    <div class="kpi-card">
-      <div class="kpi-title">Total Items</div>
-      <div class="kpi-value" id="kpi-total">—</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-title">Open Items</div>
-      <div class="kpi-value" id="kpi-open">—</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-title">Avg Age (days)</div>
-      <div class="kpi-value" id="kpi-age">—</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-title">On-Time %</div>
-      <div class="kpi-value" id="kpi-ontime">—</div>
-    </div>
-  </section>
+    <!-- KPIs -->
+    <section class="kpis">
+      <div class="kpi">
+        <div class="kpi-label">Total Items</div>
+        <div id="kpiTotal" class="kpi-value">—</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Open (WIP)</div>
+        <div id="kpiOpen" class="kpi-value">—</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Completed (MTD)</div>
+        <div id="kpiCompletedMTD" class="kpi-value">—</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">On-Time % (30d)</div>
+        <div id="kpiOnTime" class="kpi-value">—</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Median Cycle (days)</div>
+        <div id="kpiCycle" class="kpi-value">—</div>
+      </div>
+    </section>
 
-  <section class="charts">
-    <div class="chart-card">
-      <h2>Status by Category</h2>
-      <canvas id="statusByCategory"></canvas>
-    </div>
-    <div class="chart-card">
-      <h2>Monthly Throughput</h2>
-      <canvas id="monthlyThroughput"></canvas>
-    </div>
-    <div class="chart-card">
-      <h2>Aging Distribution (days)</h2>
-      <canvas id="agingDist"></canvas>
-    </div>
-  </section>
+    <!-- Filters -->
+    <section class="panel">
+      <h2>Filters</h2>
+      <div class="grid filters-grid">
+        <div>
+          <label>Status</label>
+          <select id="filterStatus" multiple></select>
+        </div>
+        <div>
+          <label>Category</label>
+          <select id="filterCategory" multiple></select>
+        </div>
+        <div>
+          <label>Date Range (Created)</label>
+          <div class="row">
+            <input id="filterFrom" type="date" />
+            <span class="to">to</span>
+            <input id="filterTo" type="date" />
+          </div>
+        </div>
+        <div class="row align-end">
+          <button id="applyFilters" class="btn">Apply</button>
+          <button id="resetFilters" class="btn ghost">Reset</button>
+        </div>
+      </div>
+    </section>
 
-  <section class="sections">
-    <h2>Design</h2>
-    <div id="design-table" class="table-wrap"></div>
+    <!-- Charts -->
+    <section class="charts">
+      <div class="chart-card">
+        <div class="chart-title">Status Distribution</div>
+        <canvas id="statusPie"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Status by Category (Stacked)</div>
+        <canvas id="categoryStacked"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Monthly Throughput (Completed per Month)</div>
+        <canvas id="throughputBar"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">WIP Trend (Open Items Over Time)</div>
+        <canvas id="wipLine"></canvas>
+      </div>
+    </section>
 
-    <h2>Nameplates</h2>
-    <div id="nameplates-table" class="table-wrap"></div>
-
-    <h2>OCR &amp; NC</h2>
-    <div id="ocrnc-table" class="table-wrap"></div>
-
-    <h2>Detailing</h2>
-    <div id="other-table" class="table-wrap"></div>
-  </section>
+    <!-- Table -->
+    <section class="panel">
+      <h2>Records</h2>
+      <div class="table-wrap">
+        <table id="dataTable">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <button id="downloadCsv" class="btn">Download Filtered CSV</button>
+    </section>
+  </main>
 
   <footer class="footer">
-    <p>Deploy via GitHub Pages. Keep your CSV at <code>data/project-tracking.csv</code>.</p>
+    <span>Built for engineering analytics — Excel → Insights on the fly.</span>
   </footer>
 
   <script src="app.js"></script>
