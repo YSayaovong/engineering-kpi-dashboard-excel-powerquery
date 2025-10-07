@@ -3,40 +3,34 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Engineering Project Tracker — Analytics</title>
+  <title>Engineering Project — Simple Analysis</title>
   <link rel="stylesheet" href="style.css" />
-
-  <!-- SheetJS (XLSX parser) -->
+  <!-- SheetJS for Excel parsing -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <!-- Chart.js -->
+  <!-- Chart.js for simple charts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <header class="topbar">
-    <h1>Engineering Project Tracker — Analytics</h1>
-    <div class="file-loaders">
+    <h1>Engineering Project — Simple Analysis</h1>
+    <div class="loader-row">
       <label class="btn">
         <input id="fileInput" type="file" accept=".xlsx,.xls" hidden />
         Load Excel
       </label>
-
-      <div class="divider">or</div>
-
+      <span class="muted">or</span>
       <form id="urlForm">
         <input id="xlsxUrl" type="text" placeholder="https://.../Project%20Tracking.xlsx" />
-        <button type="submit" class="btn">Load from URL</button>
+        <button type="submit" class="btn">Load URL</button>
       </form>
+      <span class="muted tip">Tip: place file at <code>/data/Project Tracking.xlsx</code> to auto-load.</span>
     </div>
-    <p class="hint">
-      Tip: Place <code>Project Tracking.xlsx</code> in <code>/data/</code> and the app will auto-load it. Adjust “Column Mapping” if needed.
-    </p>
   </header>
 
   <main class="container">
-    <!-- Column Mapping -->
     <section class="panel">
       <h2>Column Mapping</h2>
-      <div class="grid mapping-grid">
+      <div class="grid mapping">
         <div>
           <label>Project ID</label>
           <select id="mapProjectId"></select>
@@ -50,10 +44,6 @@
           <select id="mapLevel"></select>
         </div>
         <div>
-          <label>Created Date</label>
-          <select id="mapCreated"></select>
-        </div>
-        <div>
           <label>Due Date</label>
           <select id="mapDue"></select>
         </div>
@@ -61,100 +51,50 @@
           <label>Completed Date</label>
           <select id="mapCompleted"></select>
         </div>
-        <div>
-          <label>Title / Task</label>
-          <select id="mapTitle"></select>
-        </div>
-      </div>
-      <button id="applyMapping" class="btn primary">Apply Mapping</button>
-    </section>
-
-    <!-- KPIs -->
-    <section class="kpis">
-      <div class="kpi">
-        <div class="kpi-label">Total Items</div>
-        <div id="kpiTotal" class="kpi-value">—</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">Open (WIP)</div>
-        <div id="kpiOpen" class="kpi-value">—</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">Completed (MTD)</div>
-        <div id="kpiCompletedMTD" class="kpi-value">—</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">On-Time % (30d)</div>
-        <div id="kpiOnTime" class="kpi-value">—</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">Median Cycle (days)</div>
-        <div id="kpiCycle" class="kpi-value">—</div>
-      </div>
-    </section>
-
-    <!-- Filters -->
-    <section class="panel">
-      <h2>Filters</h2>
-      <div class="grid filters-grid">
-        <div>
-          <label>Status</label>
-          <select id="filterStatus" multiple></select>
-        </div>
-        <div>
-          <label>Group</label>
-          <select id="filterGroup" multiple></select>
-        </div>
-        <div>
-          <label>Date Range (Created)</label>
-          <div class="row">
-            <input id="filterFrom" type="date" />
-            <span class="to">to</span>
-            <input id="filterTo" type="date" />
-          </div>
-        </div>
-        <div class="row align-end">
-          <button id="applyFilters" class="btn">Apply</button>
-          <button id="resetFilters" class="btn ghost">Reset</button>
+        <div class="align-end">
+          <button id="applyMapping" class="btn primary">Apply</button>
         </div>
       </div>
     </section>
 
-    <!-- Charts -->
-    <section class="charts">
-      <div class="chart-card">
-        <div class="chart-title">Nameplates + Nameplate Errors (Stacked)</div>
-        <canvas id="grpNameplate"></canvas>
+    <section class="grid three">
+      <div class="card">
+        <h3>Nameplates + Nameplate Errors</h3>
+        <div class="counts">
+          <div><span class="lbl">Total</span><span id="np_total" class="val">—</span></div>
+          <div><span class="lbl">Open</span><span id="np_open" class="val">—</span></div>
+          <div><span class="lbl">Completed</span><span id="np_completed" class="val">—</span></div>
+          <div><span class="lbl">Overdue</span><span id="np_overdue" class="val">—</span></div>
+        </div>
+        <canvas id="np_chart"></canvas>
       </div>
-      <div class="chart-card">
-        <div class="chart-title">Tank Size + Internal Layout + Design Errors (Stacked)</div>
-        <canvas id="grpDesign"></canvas>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">Detailing + Detailing Errors (Stacked)</div>
-        <canvas id="grpDetailing"></canvas>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">WIP Trend (Open Items Over Time)</div>
-        <canvas id="wipLine"></canvas>
-      </div>
-    </section>
 
-    <!-- Table -->
-    <section class="panel">
-      <h2>Records</h2>
-      <div class="table-wrap">
-        <table id="dataTable">
-          <thead></thead>
-          <tbody></tbody>
-        </table>
+      <div class="card">
+        <h3>Tank Size + Internal Layout + Design Errors</h3>
+        <div class="counts">
+          <div><span class="lbl">Total</span><span id="ts_total" class="val">—</span></div>
+          <div><span class="lbl">Open</span><span id="ts_open" class="val">—</span></div>
+          <div><span class="lbl">Completed</span><span id="ts_completed" class="val">—</span></div>
+          <div><span class="lbl">Overdue</span><span id="ts_overdue" class="val">—</span></div>
+        </div>
+        <canvas id="ts_chart"></canvas>
       </div>
-      <button id="downloadCsv" class="btn">Download Filtered CSV</button>
+
+      <div class="card">
+        <h3>Detailing + Detailing Errors</h3>
+        <div class="counts">
+          <div><span class="lbl">Total</span><span id="dt_total" class="val">—</span></div>
+          <div><span class="lbl">Open</span><span id="dt_open" class="val">—</span></div>
+          <div><span class="lbl">Completed</span><span id="dt_completed" class="val">—</span></div>
+          <div><span class="lbl">Overdue</span><span id="dt_overdue" class="val">—</span></div>
+        </div>
+        <canvas id="dt_chart"></canvas>
+      </div>
     </section>
   </main>
 
   <footer class="footer">
-    <span>Built for engineering analytics — Excel → Insights on the fly.</span>
+    <span>Minimal engineering analysis — upload .xlsx and view counts.</span>
   </footer>
 
   <script src="app.js"></script>
