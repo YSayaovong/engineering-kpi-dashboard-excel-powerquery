@@ -1,38 +1,12 @@
-# Engineering KPI Dashboard | Manufacturing & Operations Analytics
+# Engineering KPI Workbook
+## Scope and files
+Independent manufacturing/engineering dashboard example containing `Project Tracking.xlsx` and this README. The earlier description identifies a mock engineering-log dataset and Excel pivots/charts.
 
-## Executive Summary
-This Excel dashboard tracks engineering errors, productivity metrics, and turnaround times.  
-It provides management with visibility that can reduce review cycle times by 20%.  
+## Review
+Open a copy of the workbook in Excel, inspect its tables, formulas, pivots and data connections, then refresh only after checking sources. The repository name alone does not establish that a working Power Query pipeline is present.
 
----
+## Evidence boundaries
+No measured 20% review-cycle improvement is established. Findings and suggested training are case-study interpretations pending workbook reconciliation. No employer data or savings are claimed by this documentation.
 
-## Business Problem
-Engineering teams face high error rates in transformer drawings, leading to costly production delays.  
-
-- KPI summary dashboard  
-- Error categories
----
-
-## Methodology
-- Mock dataset based on engineering logs  
-- Pivot tables & charts in Excel  
-- KPI definitions based on industry standards  
-
----
-
-## Skills
-- Excel dashboarding  
-- KPI development  
-- Manufacturing process analysis  
-
----
-
-## Results & Business Recommendation
-- Internal sub-assembly identified as main error source  
-- Recommendation: targeted team training  
-
----
-
-## Next Steps
-- Automate error logging with VBA  
-- Integrate with SQL database for real-time monitoring  
+## Portfolio direction
+Compare this workbook with Transformer BOM Quality Analytics and consolidate overlapping presentation where appropriate. Preserve the source workbook and distinguish future VBA/SQL automation from implemented features.
