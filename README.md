@@ -1,24 +1,43 @@
 # Engineering KPI Workbook
-## Scope and files
-Independent manufacturing/engineering dashboard example containing `Project Tracking.xlsx` and this README. The earlier description identifies a mock engineering-log dataset and Excel pivots/charts.
 
-## Review
-Open a copy of the workbook in Excel, inspect its tables, formulas, pivots and data connections, then refresh only after checking sources. The repository name alone does not establish that a working Power Query pipeline is present.
+**Engineering project tracking | Spreadsheet analysis | Configuration visibility**
 
-## Evidence boundaries
-No measured 20% review-cycle improvement is established. Findings and suggested training are case-study interpretations pending workbook reconciliation. No employer data or savings are claimed by this documentation.
+I developed this workbook example to explore how structured engineering project information can support clearer status reviews and follow-up decisions. My background in mechanical design shapes how I think about project records, revisions and the need for consistent reporting.
 
-## Portfolio direction
-Compare this workbook with Transformer BOM Quality Analytics and consolidate overlapping presentation where appropriate. Preserve the source workbook and distinguish future VBA/SQL automation from implemented features.
+## Business question
 
-## Hiring-manager walkthrough
+**How can engineering work be organized so a reviewer can understand project status and work in progress without relying on scattered updates?**
 
-**Business question:** How could a structured engineering project log support review of project status and work-in-progress?
+The primary artifact is [Project Tracking.xlsx](Project%20Tracking.xlsx), an Excel workbook example based on a mock engineering log.
 
-**Available artifact:** [Project Tracking.xlsx](Project%20Tracking.xlsx). This is an Excel workbook example; the README does not claim an implemented Power Query pipeline, a live dashboard or verified operational improvements.
+## What I want this project to demonstrate
 
-**Suggested evaluation:** Inspect the workbook's actual fields, table structure, formulas, pivots, charts and any external data connections. Confirm source provenance and calculation consistency before relying on the outputs.
+- Organizing engineering project records into a reviewable format
+- Thinking critically about status definitions and consistent data entry
+- Using spreadsheet reporting to support visibility and follow-up
+- Recognizing the difference between a documented dashboard concept and a verified automated reporting pipeline
 
-**Portfolio improvement backlog:** Document the real workbook schema, add a clearly synthetic example dataset if needed, record screenshots of verified views, and include repeatable refresh instructions only for functionality that exists.
+## Review the workbook
 
-**Relevant roles:** Engineering Configuration Analyst, Engineering Business Analyst and Engineering Project Analyst.
+1. Open a copy of [Project Tracking.xlsx](Project%20Tracking.xlsx) in Microsoft Excel.
+2. Review the actual sheets, tables, formulas, charts and any pivot tables.
+3. Inspect external data connections before refreshing or enabling them.
+4. Compare reported values with their source records before drawing conclusions.
+
+I have included [validate_workbook.py](validate_workbook.py), which checks that the XLSX file is structurally readable and contains worksheet XML:
+
+```bash
+python validate_workbook.py
+```
+
+The [GitHub Actions workflow](.github/workflows/checks.yml) runs this structural check. **Passing this check does not verify spreadsheet formulas, pivot tables, Power Query refreshes or the accuracy of reported metrics.**
+
+## Relevance to engineering analyst roles
+
+I am interested in roles that connect engineering information, configuration records and business processes. This workbook illustrates that direction, while keeping its demonstrated capabilities separate from features that still need verification.
+
+## Current limitations
+
+The repository does not establish that a working Power Query pipeline is present, despite its repository name. I do not claim a live dashboard, a measured 20% reduction in review time, verified cost savings or completed automation. Any future enhancement should be documented only after its workbook behavior is tested.
+
+This is a portfolio example, not a representation of confidential employer project data.
